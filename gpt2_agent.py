@@ -26,12 +26,14 @@ import os
 import logging
 
 import tensorflow as tf
+import numpy as np
 from tensorflow import Session
+from typing import Dict
 
 from gs_research_workflow.nlp.agents.gpt2.gpt_2_simple.src.encoder import Encoder
-from .gpt_2_simple.src import model, sample, encoder, memory_saving_gradients
-from .gpt_2_simple.src.load_dataset import load_dataset, Sampler
-from .gpt_2_simple.src.accumulate import AccumulatingOptimizer
+from gs_research_workflow.nlp.agents.gpt2.gpt_2_simple.src import model, sample, encoder, memory_saving_gradients
+from gs_research_workflow.nlp.agents.gpt2.gpt_2_simple.src.load_dataset import load_dataset, Sampler
+from gs_research_workflow.nlp.agents.gpt2.gpt_2_simple.src.accumulate import AccumulatingOptimizer
 
 
 from gs_research_workflow.nlp.agents.gpt2 import gpt_2_simple as gpt2
@@ -39,18 +41,15 @@ from tensorflow.core.protobuf import rewriter_config_pb2
 
 logger = logging.getLogger(__name__)
 
-model_name = "117M"
+# ---- 先忽略这部分注释的代码 -----
+# model_name = "117M"
 # gpt2.download_gpt2(model_name=model_name)   # model is saved into current directory under /models/117M/
 
-sess1 = gpt2.start_tf_sess()
+# sess1 = gpt2.start_tf_sess()
 
-gpt2.load_gpt2(sess1)
-
-raw_text = "China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018."
-
+# gpt2.load_gpt2(sess1)
 # single_text = gpt2.generate(sess, prefix=raw_text,return_as_list=True)[0]
-gpt2.generate_text(sess1, raw_text)
-
+# gpt2.generate_text(sess1, raw_text)
 # print("*"*30)
 # print(single_text)
 
@@ -63,12 +62,22 @@ class GPT2Agent:
         self.prediction_mode: bool = prediction_mode
         """是否在 prediction_mode 是一个 prediction 的参数项"""
 
-        self._tf_sess: Session = self._start_tf_sess
+        self._tf_sess: Session = self._start_tf_sess()
         self._encoder: Encoder = None
         self._checkpoint_path: str = None
 
+        self._sample_seq_fetches: Dict = None
+        """??? 具体含义不了解
+        参考 https://github.com/openai/gpt-2/blob/master/src/sample.py#L25 的返回值 """
+
+        self._x_placeholder = None
+
         # 这里是一些没有放在 'hparams.json' 中的 hyper_parameters，在 prediction step 可以修改
         # SEE: https://github.com/openai/gpt-2/blob/master/src/interactive_conditional_samples.py#L11
+
+        self._seed: int = None
+        """Integer seed for random number generators, fix seed to reproduce results"""
+
         self._nsamples: int = 1
         """Number of samples to return total"""
 
@@ -94,7 +103,7 @@ class GPT2Agent:
 
     def _start_tf_sess(self, threads=-1) -> Session:
         """
-        创建一个 tf.Session 对象
+        Returns a tf.Session w/ config
 
         考虑以后通用化之后，可以放在 tensorflow 版本的 Agent 基类
         Copy From https://github.com/minimaxir/gpt-2-simple/blob/master/gpt_2_simple/gpt_2.py#L57
@@ -143,28 +152,32 @@ class GPT2Agent:
             self._generated_token_length = hparams.n_ctx // 2
         elif self._generated_token_length > hparams.n_ctx:
             raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
-        context = tf.placeholder(tf.int32, [self._batch_size, None])
+        self._x_placeholder = tf.placeholder(tf.int32, [self._batch_size, None])
 
+        np.random.seed(self._seed)
+        tf.set_random_seed(self._seed)
 
-        #  --------
+        self._sample_seq_fetches = sample.sample_sequence(
+            hparams=hparams, length=self._generated_token_length,
+            context=self._x_placeholder,
+            batch_size=self._batch_size,
+            temperature=self._temperature, top_k=self._top_k)
 
+    def prediction(self, raw_text: str) -> str:
+        context_tokens = self._encoder.encode(raw_text)
+        generated = 0
+        ret_text = ""
+        for _ in range(self._nsamples // self._batch_size):
+            out = self._tf_sess.run(self._sample_seq_fetches, feed_dict={
+                self._x_placeholder: [context_tokens for _ in range(self._batch_size)]
+            })[:, len(context_tokens):]
+            for i in range(self._batch_size):
+                generated += 1
+                text = self._encoder.decode(out[i])
+                # print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
+                ret_text += text
+        return ret_text
 
-
-
-
-
-
-
-
-
-        np.random.seed(seed)
-        tf.set_random_seed(seed)
-        sample_seq_fetches = sample.sample_sequence(
-            hparams=hparams, length=length,
-            context=context,
-            batch_size=batch_size,
-            temperature=temperature, top_k=top_k
-        )
 
 
 if __name__ == "__main__":
@@ -172,4 +185,12 @@ if __name__ == "__main__":
     # 这里模拟了 agent 的 init 的步骤,以后可以通过 internal msg 的方式进行 trigger
     gpt2_agent.prepare_checkpoint_path()
     gpt2_agent.load_model()
+
+    raw_texts = ["China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018.",
+                 "It was a bright cold day in April, and the clocks were striking thirteen. Winston Smith, his chin nuzzled into his breast in an effort to escape the vile wind, slipped quickly through the glass doors of Victory Mansions, though not quickly enough to prevent a swirl of gritty dust from entering along with him."]
+    for txt in raw_texts:
+        next_txt = gpt2_agent.prediction(txt)
+        print("="*40)
+        print(f"[{txt}]")
+        print(next_txt)
 
