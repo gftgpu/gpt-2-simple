@@ -39,6 +39,8 @@ from gs_research_workflow.nlp.agents.gpt2.gpt_2_simple.src.accumulate import Acc
 from gs_research_workflow.nlp.agents.gpt2 import gpt_2_simple as gpt2
 from tensorflow.core.protobuf import rewriter_config_pb2
 
+from gs_research_workflow.utilities.cache_file_utils import cached_path
+
 logger = logging.getLogger(__name__)
 
 # ---- 先忽略这部分注释的代码 -----
@@ -181,16 +183,21 @@ class GPT2Agent:
 
 
 if __name__ == "__main__":
-    gpt2_agent = GPT2Agent("117M", True)
-    # 这里模拟了 agent 的 init 的步骤,以后可以通过 internal msg 的方式进行 trigger
-    gpt2_agent.prepare_checkpoint_path()
-    gpt2_agent.load_model()
+    subdir = os.path.join('models', "117M")
+    subdir = subdir.replace('\\', '/')  # needed for Windows
+    url = "https://storage.googleapis.com/gpt-2/"+subdir + "/" + "vocab.bpe"
 
-    raw_texts = ["China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018.",
-                 "It was a bright cold day in April, and the clocks were striking thirteen. Winston Smith, his chin nuzzled into his breast in an effort to escape the vile wind, slipped quickly through the glass doors of Victory Mansions, though not quickly enough to prevent a swirl of gritty dust from entering along with him."]
-    for txt in raw_texts:
-        next_txt = gpt2_agent.prediction(txt)
-        print("="*40)
-        print(f"[{txt}]")
-        print(next_txt)
+    cached_path(url,"/tmp/model_file_cache")
+    # gpt2_agent = GPT2Agent("117M", True)
+    # # 这里模拟了 agent 的 init 的步骤,以后可以通过 internal msg 的方式进行 trigger
+    # gpt2_agent.prepare_checkpoint_path()
+    # gpt2_agent.load_model()
+    #
+    # raw_texts = ["China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018.",
+    #              "It was a bright cold day in April, and the clocks were striking thirteen. Winston Smith, his chin nuzzled into his breast in an effort to escape the vile wind, slipped quickly through the glass doors of Victory Mansions, though not quickly enough to prevent a swirl of gritty dust from entering along with him."]
+    # for txt in raw_texts:
+    #     next_txt = gpt2_agent.prediction(txt)
+    #     print("="*40)
+    #     print(f"[{txt}]")
+    #     print(next_txt)
 
