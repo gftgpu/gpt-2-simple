@@ -15,14 +15,16 @@ import csv
 import argparse
 
 # if in Google Colaboratory
+from gs_research_workflow.utilities.gs_resource import set_http_proxy
+
 try:
     from google.colab import drive
 except:
     pass
 
-from gpt_2_simple.src import model, sample, encoder, memory_saving_gradients
-from gpt_2_simple.src.load_dataset import load_dataset, Sampler
-from gpt_2_simple.src.accumulate import AccumulatingOptimizer
+from .src import model, sample, encoder, memory_saving_gradients
+from .src.load_dataset import load_dataset, Sampler
+from .src.accumulate import AccumulatingOptimizer
 
 
 def download_gpt2(model_name='117M'):
@@ -31,6 +33,7 @@ def download_gpt2(model_name='117M'):
 
     Adapted from https://github.com/openai/gpt-2/blob/master/download_model.py
     """
+    set_http_proxy()
 
     subdir = os.path.join('models', model_name)
     if not os.path.exists(subdir):
@@ -294,7 +297,7 @@ def load_gpt2(sess,
     for repeated predictions.
     """
 
-    CHECKPOINT_DIR = 'checkpoint'
+    CHECKPOINT_DIR = 'models/checkpoint'
 
     checkpoint_path = os.path.join(CHECKPOINT_DIR, run_name)
 
@@ -343,7 +346,7 @@ def generate(sess,
     if prefix:
         context = tf.placeholder(tf.int32, [batch_size, None])
 
-    CHECKPOINT_DIR = 'checkpoint'
+    CHECKPOINT_DIR = 'models/checkpoint'
     SAMPLE_DIR = 'samples'
 
     checkpoint_path = os.path.join(CHECKPOINT_DIR, run_name)
