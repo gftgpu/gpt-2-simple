@@ -5,6 +5,8 @@ import requests
 import sys
 import shutil
 import re
+
+from tensorflow import Session
 from tqdm import tqdm, trange
 import numpy as np
 import tensorflow as tf
@@ -317,7 +319,7 @@ def load_gpt2(sess,
 
 
 def generate_text(
-        sess,
+        sess: Session,
         raw_text: str,
         run_name='run1',
         seed=None,
@@ -369,7 +371,7 @@ def generate_text(
     context = tf.placeholder(tf.int32, [batch_size, None])
     np.random.seed(seed)
     tf.set_random_seed(seed)
-    output = sample.sample_sequence(
+    sample_seq_fetches = sample.sample_sequence(
         hparams=hparams, length=length,
         context=context,
         batch_size=batch_size,
@@ -379,7 +381,7 @@ def generate_text(
     context_tokens = enc.encode(raw_text)
     generated = 0
     for _ in range(nsamples // batch_size):
-        out = sess.run(output, feed_dict={
+        out = sess.run(sample_seq_fetches, feed_dict={
             context: [context_tokens for _ in range(batch_size)]
         })[:, len(context_tokens):]
         for i in range(batch_size):

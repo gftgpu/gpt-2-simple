@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from gpt_2_simple.src import model
+from . import model
 
 
 def top_k_logits(logits, k):

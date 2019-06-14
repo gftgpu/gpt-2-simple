@@ -39,3 +39,8 @@ gpt2.generate_text(sess, raw_text)
 # print("*"*30)
 # print(single_text)
 
+
+class GPT2Agent:
+    def __init__(self):
+        pass
+
