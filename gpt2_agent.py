@@ -40,6 +40,7 @@ from gs_research_workflow.nlp.agents.gpt2 import gpt_2_simple as gpt2
 from tensorflow.core.protobuf import rewriter_config_pb2
 
 from gs_research_workflow.utilities.cache_file_utils import cached_path
+from gs_research_workflow.utilities.gs_resource import get_agent_file_root
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,13 @@ class GPT2Agent:
         Number of tokens in generated text, if None (default), is determined by model hyperparameters
         """
 
+    def get_model_file_path(self):
+        # 以后会根据 model def + model inst main signature 确定一个目录
+        file_path = os.path.join(get_agent_file_root(), __class__.__name__,  self.model_name)
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+        return file_path
+
     def _start_tf_sess(self, threads=-1) -> Session:
         """
         Returns a tf.Session w/ config
@@ -125,7 +133,13 @@ class GPT2Agent:
 
         暂时先 HardCode ， 以后会从一个Http(Env) 下载到本地临时文件夹进行缓存
         """
-        self._checkpoint_path = "/tmp/laigen/gs_research_workflow/nlp/agents/gpt2/models/117M"
+        # self._checkpoint_path = "/tmp/laigen/gs_research_workflow/nlp/agents/gpt2/models/117M"
+        self._checkpoint_path = self.get_model_file_path()
+        for filename in ['checkpoint', 'encoder.json', 'hparams.json',
+                         'model.ckpt.data-00000-of-00001', 'model.ckpt.index',
+                         'model.ckpt.meta', 'vocab.bpe']:
+            url = "https://storage.googleapis.com/gpt-2/" + os.path.join('models', self.model_name).replace('\\', '/') + "/" + filename
+            cached_path(url, self._checkpoint_path)
 
     def load_model(self):
         assert self._checkpoint_path is not None
@@ -181,23 +195,17 @@ class GPT2Agent:
         return ret_text
 
 
-
 if __name__ == "__main__":
-    subdir = os.path.join('models', "117M")
-    subdir = subdir.replace('\\', '/')  # needed for Windows
-    url = "https://storage.googleapis.com/gpt-2/"+subdir + "/" + "vocab.bpe"
+    gpt2_agent = GPT2Agent("117M", True)
+    # 这里模拟了 agent 的 init 的步骤,以后可以通过 internal msg 的方式进行 trigger
+    gpt2_agent.prepare_checkpoint_path()
+    gpt2_agent.load_model()
 
-    cached_path(url,"/tmp/model_file_cache")
-    # gpt2_agent = GPT2Agent("117M", True)
-    # # 这里模拟了 agent 的 init 的步骤,以后可以通过 internal msg 的方式进行 trigger
-    # gpt2_agent.prepare_checkpoint_path()
-    # gpt2_agent.load_model()
-    #
-    # raw_texts = ["China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018.",
-    #              "It was a bright cold day in April, and the clocks were striking thirteen. Winston Smith, his chin nuzzled into his breast in an effort to escape the vile wind, slipped quickly through the glass doors of Victory Mansions, though not quickly enough to prevent a swirl of gritty dust from entering along with him."]
-    # for txt in raw_texts:
-    #     next_txt = gpt2_agent.prediction(txt)
-    #     print("="*40)
-    #     print(f"[{txt}]")
-    #     print(next_txt)
+    raw_texts = ["China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018.",
+                 "It was a bright cold day in April, and the clocks were striking thirteen. Winston Smith, his chin nuzzled into his breast in an effort to escape the vile wind, slipped quickly through the glass doors of Victory Mansions, though not quickly enough to prevent a swirl of gritty dust from entering along with him."]
+    for txt in raw_texts:
+        next_txt = gpt2_agent.prediction(txt)
+        print("="*40)
+        print(f"[{txt}]")
+        print(next_txt)
 
