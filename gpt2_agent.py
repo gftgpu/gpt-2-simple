@@ -16,6 +16,8 @@ SEE : https://github.com/openai/gpt-2/tree/master/src
 
 决定先试一个 tensorflow 版本的 GPT2 (因为官方版本为 tensorflow )
 SEE : https://github.com/minimaxir/gpt-2-simple
+SEE : https://colab.research.google.com/drive/1VLG8e7YSEwypxU-noRNhsv5dW4NfTGce
+
 
 """
 
@@ -29,5 +31,11 @@ sess = gpt2.start_tf_sess()
 
 gpt2.load_gpt2(sess)
 
-single_text = gpt2.generate(sess, return_as_list=True)[0]
-print(single_text)
+raw_text = "China and the United States have been engaged in a trade war through increasing tariffs and other measures since 2018."
+
+# single_text = gpt2.generate(sess, prefix=raw_text,return_as_list=True)[0]
+gpt2.generate_text(sess, raw_text)
+
+# print("*"*30)
+# print(single_text)
+
